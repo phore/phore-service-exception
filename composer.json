@@ -1,0 +1,29 @@
+{
+  "name": "phore/service-exception",
+  "description": "Transform json/xml service responds to exceptions",
+  "license": "MIT",
+  "authors": [
+    { "name": "Matthias Leuffen", "email": "m@tth.es" }
+  ],
+  "require": {
+    "php": ">=8.1"
+  },
+
+  "suggest": {
+  },
+  "autoload": {
+    "psr-4": {
+      "Phore\\ServiceException\\": "src/"
+    },
+    "files": [
+      "src/functions.php"
+    ]
+  },
+  "minimum-stability": "dev",
+  "require-dev": {
+    "phore/tester": "*"
+  },
+  "config": {
+    "preferred-install": "source"
+  }
+}
