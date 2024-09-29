@@ -66,10 +66,6 @@ class ServiceExceptionKernel
      */
     public function fromThrowable(\Throwable $throwable, ?int $httpStatusCode = null): ServiceException
     {
-        if ($throwable instanceof ServiceException) {
-            return $throwable;
-        }
-
         return ServiceException::fromThrowable($throwable, $this->serviceName, $httpStatusCode ?? $this->defaultHttpStatusCode, $this->traceId);
     }
 
@@ -90,7 +86,7 @@ class ServiceExceptionKernel
      * @param ServiceException $exception
      */
     public function toApiResponse(ServiceException $exception) : array {
-        return $exception->toApiResponse($this->detailLevel, $this->environment);
+        return $this->fromThrowable($exception)->toApiResponse($this->detailLevel, $this->environment);
     }
 
 

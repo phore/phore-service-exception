@@ -8,7 +8,7 @@ use JsonSerializable;
 class ServiceException extends Exception implements JsonSerializable, \Stringable
 {
     private string $errorCode;
-    private string $service;
+    private ?string $service;
     private string $timestamp;
     private ?string $traceId;
     private ?string $exceptionType;
@@ -20,7 +20,7 @@ class ServiceException extends Exception implements JsonSerializable, \Stringabl
     public function __construct(
         string $errorCode,
         string $message,
-        string $service = null,
+        ?string $service = null,
         int $httpStatusCode = 500,
         ?string $timestamp = null,
         ?string $traceId = null,
@@ -59,6 +59,8 @@ class ServiceException extends Exception implements JsonSerializable, \Stringabl
     {
         // If the exception is already a ServiceException, return it directly
         if ($error instanceof ServiceException) {
+            if ($error->service === null)
+                $error->service = $service;
             return $error;
         }
 
