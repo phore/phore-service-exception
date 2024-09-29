@@ -45,7 +45,7 @@ class ServiceException extends Exception implements JsonSerializable
     /**
      * Create a ServiceException from an Exception or Error.
      */
-    public static function fromThrowable(Exception|\Error|\Throwable $error, string $service, int $httpStatusCode = 500): ServiceException
+    public static function fromThrowable(\Throwable $error, string $service, int $httpStatusCode = 500): ServiceException
     {
         // If the exception is already a ServiceException, return it directly
         if ($error instanceof ServiceException) {
@@ -56,15 +56,11 @@ class ServiceException extends Exception implements JsonSerializable
         if ($previous = $error->getPrevious()) {
             $innerError = self::fromThrowable($previous, $service);
         }
-        $details = null;
-        if ($error instanceof \Error || $error instanceof \Exception) {
-            $details = [
-                'file' => $error->getFile(),
-                'line' => $error->getLine(),
-                "message" => $error->getMessage(),
-                "trace" => explode("\n", $error->getTraceAsString())
-            ];
-        }
+        $trace = ["Thrwon in " . $error->getFile() . " on line " . $error->getLine(),
+            ...explode("\n", $error->getTraceAsString())
+        ];
+
+
 
         return new self(
             errorCode: 'INTERNAL_ERROR',
@@ -72,9 +68,9 @@ class ServiceException extends Exception implements JsonSerializable
             service: $service,
             httpStatusCode: $httpStatusCode,
             exceptionType: get_class($error),
-            details: $details,
+            details: null,
             innerError: $innerError,
-            stackTrace: $error->getTrace()
+            stackTrace: $trace
         );
     }
 
@@ -274,34 +270,7 @@ class ServiceException extends Exception implements JsonSerializable
         return $output;
     }
 
-    /**
-     * Format the stack trace for display.
-     *
-     * @param array $stackTrace
-     * @return string
-     */
-    private function formatStackTrace(array $stackTrace): string
-    {
-        $formatted = '';
-        foreach ($stackTrace as $index => $frame) {
-            $formatted .= "#{$index} ";
-            if (isset($frame['file'])) {
-                $formatted .= "{$frame['file']}";
-                if (isset($frame['line'])) {
-                    $formatted .= "({$frame['line']})";
-                }
-                $formatted .= ": ";
-            }
-            if (isset($frame['class'])) {
-                $formatted .= "{$frame['class']}{$frame['type']}";
-            }
-            if (isset($frame['function'])) {
-                $formatted .= "{$frame['function']}()";
-            }
-            $formatted .= "\n";
-        }
-        return $formatted;
-    }
+
 
     /**
      * Convert the exception to an associative array.
