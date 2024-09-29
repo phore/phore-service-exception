@@ -56,6 +56,15 @@ class ServiceException extends Exception implements JsonSerializable
         if ($previous = $error->getPrevious()) {
             $innerError = self::fromException($previous, $service);
         }
+        $details = null;
+        if ($error instanceof \Error || $error instanceof \Exception) {
+            $details = [
+                'file' => $error->getFile(),
+                'line' => $error->getLine(),
+                "message" => $error->getMessage(),
+                "trace" => explode("\n", $error->getTraceAsString())
+            ];
+        }
 
         return new self(
             errorCode: 'INTERNAL_ERROR',
@@ -63,7 +72,7 @@ class ServiceException extends Exception implements JsonSerializable
             service: $service,
             httpStatusCode: $httpStatusCode,
             exceptionType: get_class($error),
-            details: null,
+            details: $details,
             innerError: $innerError,
             stackTrace: $error->getTrace()
         );

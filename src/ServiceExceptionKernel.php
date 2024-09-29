@@ -70,21 +70,7 @@ class ServiceExceptionKernel
             return $throwable;
         }
 
-        $innerError = null;
-        if ($previous = $throwable->getPrevious()) {
-            $innerError = $this->fromThrowable($previous);
-        }
-
-        return new ServiceException(
-            errorCode: 'INTERNAL_ERROR',
-            message: $throwable->getMessage(),
-            service: $this->serviceName,
-            httpStatusCode: $httpStatusCode ?? $this->defaultHttpStatusCode,
-            traceId: $this->traceId,
-            exceptionType: get_class($throwable),
-            innerError: $innerError,
-            stackTrace: $throwable->getTrace()
-        );
+        return ServiceException::fromException($throwable, $this->serviceName, $httpStatusCode ?? $this->defaultHttpStatusCode, $this->traceId);
     }
 
     /**
