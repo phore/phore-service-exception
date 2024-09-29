@@ -20,11 +20,14 @@ class ServiceException extends Exception implements JsonSerializable
     public function __construct(
         string $errorCode,
         string $message,
-        string $service,
+        string $service = "unknown",
         int $httpStatusCode = 500,
         ?string $timestamp = null,
         ?string $traceId = null,
         ?string $exceptionType = null,
+        /**
+         * Additional details about the error.
+         */
         ?array $details = null,
         ?ServiceException $innerError = null,
         ?array $stackTrace = null
@@ -61,9 +64,14 @@ class ServiceException extends Exception implements JsonSerializable
         ];
 
 
+        $errorCode = "EXCEPTION";
+        if ($error instanceof \InvalidArgumentException)
+            $errorCode = "INVALID_ARGUMENT";
+        if ($error instanceof \Error)
+            $errorCode = "INTERNAL_ERROR";
 
         return new self(
-            errorCode: 'INTERNAL_ERROR',
+            errorCode: $errorCode,
             message: $error->getMessage(),
             service: $service,
             httpStatusCode: $httpStatusCode,
