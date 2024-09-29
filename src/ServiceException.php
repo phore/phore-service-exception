@@ -66,7 +66,7 @@ class ServiceException extends Exception implements JsonSerializable, \Stringabl
             service: $service,
             exceptionType: get_class($error),
             details: null,
-            innerError: $innerError,
+            innerError: $innerError->payload ?? null,
             stackTrace: $trace,
             httpStatusCode: $httpStatusCode
         ), $httpStatusCode);
