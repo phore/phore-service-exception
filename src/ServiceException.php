@@ -59,7 +59,7 @@ class ServiceException extends Exception implements JsonSerializable
         if ($previous = $error->getPrevious()) {
             $innerError = self::fromThrowable($previous, $service);
         }
-        $trace = ["Thrwon in " . $error->getFile() . " on line " . $error->getLine(),
+        $trace = ["Thrown in " . $error->getFile() . " on line " . $error->getLine(),
             ...explode("\n", $error->getTraceAsString())
         ];
 
