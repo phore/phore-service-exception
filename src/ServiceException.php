@@ -45,7 +45,7 @@ class ServiceException extends Exception implements JsonSerializable
     /**
      * Create a ServiceException from an Exception or Error.
      */
-    public static function fromException(Exception|\Error|\Throwable $error, string $service, int $httpStatusCode = 500): ServiceException
+    public static function fromThrowable(Exception|\Error|\Throwable $error, string $service, int $httpStatusCode = 500): ServiceException
     {
         // If the exception is already a ServiceException, return it directly
         if ($error instanceof ServiceException) {
@@ -54,7 +54,7 @@ class ServiceException extends Exception implements JsonSerializable
 
         $innerError = null;
         if ($previous = $error->getPrevious()) {
-            $innerError = self::fromException($previous, $service);
+            $innerError = self::fromThrowable($previous, $service);
         }
         $details = null;
         if ($error instanceof \Error || $error instanceof \Exception) {

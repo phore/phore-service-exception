@@ -70,7 +70,7 @@ class ServiceExceptionKernel
             return $throwable;
         }
 
-        return ServiceException::fromException($throwable, $this->serviceName, $httpStatusCode ?? $this->defaultHttpStatusCode, $this->traceId);
+        return ServiceException::fromThrowable($throwable, $this->serviceName, $httpStatusCode ?? $this->defaultHttpStatusCode, $this->traceId);
     }
 
     /**
