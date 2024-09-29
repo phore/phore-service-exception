@@ -4,6 +4,7 @@ namespace Phore\ServiceException\Types;
 
 use Http\Client\Exception;
 use Phore\ServiceException\ServiceException;
+use Phore\ServiceException\T_ServiceException;
 
 class InputValidationServiceException extends ServiceException
 {
@@ -11,14 +12,13 @@ class InputValidationServiceException extends ServiceException
     public function __construct(
         string $message,
         array $details = null,
-        Exception $innerError = null
+        \Throwable $parent = null
     ) {
-        parent::__construct(
-            errorCode: "input_validation_error",
+        parent::__construct(new T_ServiceException(
             message: $message,
-            httpStatusCode: 400,
-            details: $details,
-            innerError: $innerError
+            errorCode: "input_validation",
+            details: $details
+        ), 400, $parent
         );
     }
 

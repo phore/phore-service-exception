@@ -7,42 +7,23 @@ use JsonSerializable;
 
 class ServiceException extends Exception implements JsonSerializable, \Stringable
 {
-    private string $errorCode;
-    private ?string $service;
-    private string $timestamp;
-    private ?string $traceId;
-    private ?string $exceptionType;
-    private ?array $details;
-    private ?ServiceException $innerError;
-    private array $stackTrace;
-    private int $httpStatusCode;
+
 
     public function __construct(
-        string $errorCode,
-        string $message,
-        ?string $service = null,
-        int $httpStatusCode = 500,
-        ?string $timestamp = null,
-        ?string $traceId = null,
-        ?string $exceptionType = null,
+        private T_ServiceException $payload,
         /**
-         * Additional details about the error.
+         * If it is >400 it is the initial http status code to be returned
          */
-        ?array $details = null,
-        ?ServiceException $innerError = null,
-        ?array $stackTrace = null
+        int $code = 0,
+        \Throwable $previous = null
     ) {
-        parent::__construct($message);
-
-        $this->errorCode = $errorCode;
-        $this->service = $service;
-        $this->httpStatusCode = $httpStatusCode;
-        $this->timestamp = $timestamp ?? (new \DateTime())->format('c');
-        $this->traceId = $traceId;
-        $this->exceptionType = $exceptionType ?? (new \ReflectionClass($this))->getShortName();
-        $this->details = $details;
-        $this->innerError = $innerError;
-        $this->stackTrace = $stackTrace ?? self::formatStackTrace($this);
+        parent::__construct($this->payload->message, $code, $previous);
+        if ($this->payload->exceptionType === null)
+            $this->payload->exceptionType = (new \ReflectionObject($this))->getShortName();
+        if ($this->payload->stackTrace === null)
+            $this->payload->stackTrace = self::formatStackTrace($this);
+        if ($code !== 0)
+            $this->payload->httpStatusCode = $code;
     }
 
     private static function formatStackTrace ( \Throwable $e) : array {
@@ -52,6 +33,8 @@ class ServiceException extends Exception implements JsonSerializable, \Stringabl
         return $trace;
     }
 
+
+
     /**
      * Create a ServiceException from an Exception or Error.
      */
@@ -59,8 +42,8 @@ class ServiceException extends Exception implements JsonSerializable, \Stringabl
     {
         // If the exception is already a ServiceException, return it directly
         if ($error instanceof ServiceException) {
-            if ($error->service === null)
-                $error->service = $service;
+            if ($error->payload->service === null)
+                $error->payload->service = $service;
             return $error;
         }
 
@@ -77,16 +60,16 @@ class ServiceException extends Exception implements JsonSerializable, \Stringabl
         if ($error instanceof \Error)
             $errorCode = "INTERNAL_ERROR";
 
-        return new self(
-            errorCode: $errorCode,
+        return new self(new T_ServiceException(
             message: $error->getMessage(),
+            errorCode: $errorCode,
             service: $service,
-            httpStatusCode: $httpStatusCode,
             exceptionType: get_class($error),
             details: null,
             innerError: $innerError,
-            stackTrace: $trace
-        );
+            stackTrace: $trace,
+            httpStatusCode: $httpStatusCode
+        ), $httpStatusCode);
     }
 
     /**
@@ -95,67 +78,54 @@ class ServiceException extends Exception implements JsonSerializable, \Stringabl
     public function jsonSerialize(): array
     {
         return [
-            'error' => array_filter([
-                'code' => $this->errorCode,
-                'message' => $this->getMessage(),
-                'service' => $this->service,
-                'http_status_code' => $this->httpStatusCode,
-                'timestamp' => $this->timestamp,
-                'trace_id' => $this->traceId,
-                'exception_type' => $this->exceptionType,
-                'details' => $this->details,
-                'stack_trace' => $this->stackTrace,
-                'inner_error' => $this->innerError ? $this->innerError->jsonSerialize()['error'] : null,
-            ], function ($value) {
-                return $value !== null;
-            })
+            'error' => $this->payload->toArray()
         ];
     }
 
     // Getters for the properties
     public function getErrorCode(): string
     {
-        return $this->errorCode;
+        return $this->payload->errorCode;
     }
 
     public function getService(): string
     {
-        return $this->service;
+        return $this->payload->service;
     }
 
     public function getTimestamp(): string
     {
-        return $this->timestamp;
+        return $this->payload->timestamp;
     }
 
     public function getTraceId(): ?string
     {
-        return $this->traceId;
+        return $this->payload->traceId;
     }
 
     public function getExceptionType(): ?string
     {
-        return $this->exceptionType;
+        return $this->payload->exceptionType;
     }
 
     public function getDetails(): ?array
     {
-        return $this->details;
+        return $this->payload->details;
     }
 
     public function getInnerError(): ?ServiceException
     {
-        return $this->innerError;
+        return new ServiceException($this->payload->innerError);
     }
 
     public function getStackTrace(): array
     {
-        return $this->stackTrace;
+        return $this->payload->stackTrace;
     }
 
     public function getHttpStatusCode(): int
     {
-        return $this->httpStatusCode;
+        return $this->payload->httpStatusCode;
     }
 
     /**
@@ -169,6 +139,13 @@ class ServiceException extends Exception implements JsonSerializable, \Stringabl
     public static function fromJson(string $json, bool $strict = false): ?ServiceException
     {
 
+        if (! str_starts_with($json, '{')) {
+            if ($strict) {
+                throw new \InvalidArgumentException('Invalid JSON provided: JSON must be an object.');
+            } else {
+                return null;
+            }
+        }
         $data = json_decode($json, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
@@ -179,15 +156,8 @@ class ServiceException extends Exception implements JsonSerializable, \Stringabl
             }
         }
 
-        if (!isset($data['error']) || !is_array($data['error'])) {
-            if ($strict) {
-                throw new \InvalidArgumentException('Invalid error format: "error" key missing or not an array.');
-            } else {
-                return null;
-            }
-        }
 
-        return self::fromArray($data['error'], $strict);
+        return self::fromArray($data, $strict);
     }
 
     /**
@@ -200,62 +170,23 @@ class ServiceException extends Exception implements JsonSerializable, \Stringabl
      */
     public static function fromArray(array $data, bool $strict = false): ?ServiceException
     {
-        // Validate required fields
-        $requiredFields = ['code', 'message', 'service', 'timestamp'];
-        foreach ($requiredFields as $field) {
-            if (!isset($data[$field])) {
-                if ($strict) {
-                    throw new \InvalidArgumentException("Invalid error format: \"$field\" is required.");
-                } else {
-                    return null;
-                }
-            }
-        }
 
-        // Validate data types
-        if (
-            !is_string($data['code']) ||
-            !is_string($data['message']) ||
-            !is_string($data['service']) ||
-            !is_string($data['timestamp'])
-        ) {
+        if (!isset($data['error']) || !is_array($data['error'])) {
             if ($strict) {
-                throw new \InvalidArgumentException('Invalid data types for required fields.');
+                throw new \InvalidArgumentException('Invalid error format: "error" key missing or not an array.');
             } else {
                 return null;
             }
         }
+        $payload = T_ServiceException::fromArray($data["error"], $strict);
 
-        // Parse the inner error if present
-        $innerError = null;
-        if (isset($data['inner_error'])) {
-            if (is_array($data['inner_error'])) {
-                $innerError = self::fromArray($data['inner_error'], $strict);
-            } else {
-                if ($strict) {
-                    throw new \InvalidArgumentException('Invalid inner_error format: expected an array.');
-                } else {
-                    return null;
-                }
-            }
+        if ($payload === null) {
+            return null;
         }
 
-        // Parse the stack trace if present
-        $stackTrace = $data['stack_trace'] ?? [];
 
         // Create and return the ServiceException
-        return new self(
-            errorCode: $data['code'],
-            message: $data['message'],
-            service: $data['service'],
-            httpStatusCode: isset($data['http_status_code']) ? (int) $data['http_status_code'] : 500,
-            timestamp: $data['timestamp'],
-            traceId: $data['trace_id'] ?? null,
-            exceptionType: $data['exception_type'] ?? null,
-            details: $data['details'] ?? null,
-            innerError: $innerError,
-            stackTrace: is_array($stackTrace) ? $stackTrace : []
-        );
+        return new self($payload);
     }
 
     /**
@@ -265,26 +196,16 @@ class ServiceException extends Exception implements JsonSerializable, \Stringabl
      */
     public function __toString(): string
     {
-        $output = "ServiceException [{$this->errorCode}]: {$this->getMessage()}";
-        $output .= "\nService: {$this->service}";
-        $output .= "\nHTTP Status Code: {$this->httpStatusCode}";
-        $output .= "\nTimestamp: {$this->timestamp}";
-        if ($this->traceId) {
-            $output .= "\nTrace ID: {$this->traceId}";
-        }
-        $output .= "\nException Type: {$this->exceptionType}";
-        if ($this->details) {
-            $output .= "\nDetails: " . json_encode($this->details, JSON_PRETTY_PRINT);
-        }
-        $output .= "\nStack Trace:\n" . implode("\n  ", $this->stackTrace);
 
-        if ($this->innerError) {
-            $output .= "\nCaused by:\n" . $this->innerError->__toString();
-        }
-
+        $output = "ServiceException [{$this->payload->errorCode}]: '{$this->getMessage()}' (Service: '{$this->payload->service}', HTTP Status Code: {$this->payload->httpStatusCode}, Thrown in {$this->payload->stackTrace[0]})";
         return $output;
     }
 
+
+    public function __debugInfo(): array
+    {
+        return $this->toArray();
+    }
 
 
     /**
@@ -294,18 +215,7 @@ class ServiceException extends Exception implements JsonSerializable, \Stringabl
      */
     public function toArray(): array
     {
-        return [
-            'code' => $this->errorCode,
-            'message' => $this->getMessage(),
-            'service' => $this->service,
-            'http_status_code' => $this->httpStatusCode,
-            'timestamp' => $this->timestamp,
-            'trace_id' => $this->traceId,
-            'exception_type' => $this->exceptionType,
-            'details' => $this->details,
-            'stack_trace' => $this->stackTrace,
-            'inner_error' => $this->innerError ? $this->innerError->toArray() : null,
-        ];
+        return $this->payload->toArray();
     }
 
     /**
@@ -313,13 +223,9 @@ class ServiceException extends Exception implements JsonSerializable, \Stringabl
      *
      * @return ServiceException
      */
-    public function getRootCause(): ServiceException
+    public function getRootCause(): T_ServiceException
     {
-        $current = $this;
-        while ($current->innerError !== null) {
-            $current = $current->innerError;
-        }
-        return $current;
+        return $this->payload->getRootCause();
     }
 
     /**
@@ -329,11 +235,7 @@ class ServiceException extends Exception implements JsonSerializable, \Stringabl
      */
     public function getAllMessages(): array
     {
-        $messages = [$this->getMessage()];
-        if ($this->innerError) {
-            $messages = array_merge($messages, $this->innerError->getAllMessages());
-        }
-        return $messages;
+        return $this->payload->getAllMessages();
     }
 
 
@@ -347,38 +249,7 @@ class ServiceException extends Exception implements JsonSerializable, \Stringabl
      */
     public function toApiResponse(int $detailLevel = 0, string $environment = 'production'): array
     {
-        // Determine whether to include sensitive information
-        $includeSensitiveInfo = ($environment !== 'production') && ($detailLevel > 0);
-
-        // Base error structure
-        $error = [
-            'code' => $this->errorCode,
-            'message' => $this->getMessage(),
-            'service' => $this->service,
-            'http_status_code' => $this->httpStatusCode,
-        ];
-
-        // Include additional details based on detail level
-        if ($detailLevel >= 1) {
-            $error['timestamp'] = $this->timestamp;
-            $error['trace_id'] = $this->traceId;
-            $error['exception_type'] = $this->exceptionType;
-        }
-
-        // Include sensitive details if allowed
-        if ($includeSensitiveInfo) {
-            if ($this->details) {
-                $error['details'] = $this->details;
-            }
-            $error['stack_trace'] = $this->stackTrace;
-        }
-
-        // Include inner error recursively if detail level allows
-        if ($this->innerError && $detailLevel >= 1) {
-            $error['inner_error'] = $this->innerError->toApiResponse($detailLevel, $environment)['error'];
-        }
-
-        return ['error' => $error];
+        return $this->payload->toApiResponse($detailLevel, $environment);
     }
 
 }

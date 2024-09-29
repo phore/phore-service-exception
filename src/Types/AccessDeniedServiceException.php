@@ -3,6 +3,7 @@
 namespace Phore\ServiceException\Types;
 
 use Phore\ServiceException\ServiceException;
+use Phore\ServiceException\T_ServiceException;
 
 class AccessDeniedServiceException extends ServiceException
 {
@@ -10,15 +11,13 @@ class AccessDeniedServiceException extends ServiceException
         public function __construct(
             string $message,
             array $details = null,
-            \Exception $innerError = null
+            \Throwable $parent = null
         ) {
-            parent::__construct(
-                errorCode: "access_denied",
+            parent::__construct(new T_ServiceException(
                 message: $message,
-                httpStatusCode: 403,
-                details: $details,
-                innerError: $innerError
-            );
+                errorCode: "access_denied",
+                details: $details
+            ), 403, $parent);
         }
 
 }

@@ -44,15 +44,15 @@ class ServiceExceptionKernel
         ?ServiceException $innerError = null,
         ?string $exceptionType = null
     ): ServiceException {
-        return new ServiceException(
-            errorCode: $errorCode,
+        return new ServiceException(new T_ServiceException(
             message: $message,
+            errorCode: $errorCode,
             service: $this->serviceName,
-            httpStatusCode: $httpStatusCode ?? $this->defaultHttpStatusCode,
-            traceId: $this->traceId,
             exceptionType: $exceptionType,
             details: $details,
-            innerError: $innerError
+            innerError: $innerError,
+            httpStatusCode: $httpStatusCode),
+            $httpStatusCode ?? $this->defaultHttpStatusCode
         );
     }
 
@@ -66,7 +66,7 @@ class ServiceExceptionKernel
      */
     public function fromThrowable(\Throwable $throwable, ?int $httpStatusCode = null): ServiceException
     {
-        return ServiceException::fromThrowable($throwable, $this->serviceName, $httpStatusCode ?? $this->defaultHttpStatusCode, $this->traceId);
+        return ServiceException::fromThrowable($throwable, $this->serviceName, $httpStatusCode ?? $this->defaultHttpStatusCode);
     }
 
     /**
