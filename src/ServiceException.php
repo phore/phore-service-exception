@@ -5,7 +5,7 @@ namespace Phore\ServiceException;
 use Exception;
 use JsonSerializable;
 
-class ServiceException extends Exception implements JsonSerializable
+class ServiceException extends Exception implements JsonSerializable, \Stringable
 {
     private string $errorCode;
     private string $service;
@@ -20,7 +20,7 @@ class ServiceException extends Exception implements JsonSerializable
     public function __construct(
         string $errorCode,
         string $message,
-        string $service = "unknown",
+        string $service = null,
         int $httpStatusCode = 500,
         ?string $timestamp = null,
         ?string $traceId = null,
@@ -42,7 +42,14 @@ class ServiceException extends Exception implements JsonSerializable
         $this->exceptionType = $exceptionType ?? (new \ReflectionClass($this))->getShortName();
         $this->details = $details;
         $this->innerError = $innerError;
-        $this->stackTrace = $stackTrace ?? $this->getTrace();
+        $this->stackTrace = $stackTrace ?? self::formatStackTrace($this);
+    }
+
+    private static function formatStackTrace ( \Throwable $e) : array {
+        $trace = ["Thrown in " . $e->getFile() . " on line " . $e->getLine(),
+            ...explode("\n", $e->getTraceAsString())
+        ];
+        return $trace;
     }
 
     /**
@@ -59,9 +66,7 @@ class ServiceException extends Exception implements JsonSerializable
         if ($previous = $error->getPrevious()) {
             $innerError = self::fromThrowable($previous, $service);
         }
-        $trace = ["Thrown in " . $error->getFile() . " on line " . $error->getLine(),
-            ...explode("\n", $error->getTraceAsString())
-        ];
+        $trace = self::formatStackTrace($error);
 
 
         $errorCode = "EXCEPTION";
@@ -269,7 +274,7 @@ class ServiceException extends Exception implements JsonSerializable
         if ($this->details) {
             $output .= "\nDetails: " . json_encode($this->details, JSON_PRETTY_PRINT);
         }
-        $output .= "\nStack Trace:\n" . $this->formatStackTrace($this->stackTrace);
+        $output .= "\nStack Trace:\n" . implode("\n  ", $this->stackTrace);
 
         if ($this->innerError) {
             $output .= "\nCaused by:\n" . $this->innerError->__toString();
