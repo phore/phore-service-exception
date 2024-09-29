@@ -90,7 +90,7 @@ class ServiceExceptionKernel
      * @param ServiceException $exception
      */
     public function toApiResponse(ServiceException $exception) : array {
-        $exception->toApiResponse($this->detailLevel, $this->environment);
+        return $exception->toApiResponse($this->detailLevel, $this->environment);
     }
 
 
